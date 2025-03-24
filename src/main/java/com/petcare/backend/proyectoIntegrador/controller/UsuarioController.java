@@ -10,6 +10,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.stream.Collectors;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("api/usuarios")
@@ -77,13 +81,71 @@ public class UsuarioController {
                 .orElse(new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable Integer id) {
-        if (usuarioService.obtenerPorId(id).isPresent()) {
+    @DeleteMapping("/usuario-list/{id}")
+    public ResponseEntity<?> eliminarUsuario(@PathVariable Integer id) {
+        System.out.println("Iniciando proceso de eliminación lógica para usuario ID: " + id);
+        
+        try {
+            // Primero verificamos si el usuario existe
+            Optional<Usuario> usuarioOptional = usuarioService.obtenerPorId(id);
+            
+            if (usuarioOptional.isEmpty()) {
+                System.out.println("Usuario no encontrado con ID: " + id);
+                return ResponseEntity.notFound().build();
+            }
+
+            Usuario usuario = usuarioOptional.get();
+            System.out.println("Usuario encontrado: " + usuario.getNombre() + " (ID: " + usuario.getIdUsuario() + ")");
+
+            // Realizamos el borrado lógico
             usuarioService.eliminar(id);
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+            
+            // Verificamos que el usuario haya sido marcado como borrado
+            Optional<Usuario> verificacion = usuarioService.obtenerPorId(id);
+            if (verificacion.isPresent() && !verificacion.get().isEsBorrado()) {
+                System.out.println("Error: El usuario no fue marcado como borrado");
+                return ResponseEntity.internalServerError()
+                        .body(Map.of(
+                            "mensaje", "Error: El usuario no pudo ser marcado como borrado",
+                            "success", false
+                        ));
+            }
+
+            System.out.println("Usuario marcado como borrado exitosamente");
+            Map<String, Object> response = new HashMap<>();
+            response.put("mensaje", "Usuario eliminado correctamente");
+            response.put("id", id);
+            response.put("success", true);
+            response.put("usuarioEliminado", usuario.getNombre());
+            
+            // Obtener la lista actualizada de usuarios
+            List<Usuario> usuariosActivos = usuarioService.listarTodos();
+            List<Map<String, Object>> usuariosActualizados = usuariosActivos.stream()
+                .map(u -> {
+                    Map<String, Object> usuarioMap = new HashMap<>();
+                    usuarioMap.put("id", u.getIdUsuario());
+                    usuarioMap.put("nombre", u.getNombre());
+                    usuarioMap.put("apellido", u.getApellido());
+                    usuarioMap.put("email", u.getEmail());
+                    usuarioMap.put("rol", u.getRole().toString());
+                    return usuarioMap;
+                })
+                .collect(Collectors.toList());
+            
+            response.put("usuariosActualizados", usuariosActualizados);
+            
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            System.out.println("Error durante el borrado lógico: " + e.getMessage());
+            e.printStackTrace();
+            
+            return ResponseEntity.internalServerError()
+                    .body(Map.of(
+                        "mensaje", "Error al marcar el usuario como eliminado: " + e.getMessage(),
+                        "success", false
+                    ));
         }
-        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
 
     @GetMapping("/profile")
@@ -96,5 +158,23 @@ public class UsuarioController {
         System.out.println(usuario.getRole());
 
         return ResponseEntity.ok(new UserProfileResponse(usuario));
+    }
+
+    @GetMapping("/usuario-list")
+    public ResponseEntity<List<Map<String, Object>>> listarUsuarios() {
+        List<Usuario> usuarios = usuarioService.listarTodos(); // Este método ya filtra los usuarios activos
+        List<Map<String, Object>> usuariosSimplificados = usuarios.stream()
+            .map(usuario -> { //Transformo los objetos Usuarios en maps simples para evitar bucles infinitos
+                Map<String, Object> usuarioMap = new HashMap<>();
+                usuarioMap.put("id", usuario.getIdUsuario());
+                usuarioMap.put("nombre", usuario.getNombre());
+                usuarioMap.put("apellido", usuario.getApellido());
+                usuarioMap.put("email", usuario.getEmail());
+                usuarioMap.put("rol", usuario.getRole().toString());  // Convertimos el enum a String y usamos 'rol' para que coincida con el front
+                return usuarioMap;
+            })
+            .collect(Collectors.toList());
+
+        return ResponseEntity.ok(usuariosSimplificados);
     }
 } 
