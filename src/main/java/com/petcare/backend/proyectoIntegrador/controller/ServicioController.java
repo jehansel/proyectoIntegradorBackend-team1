@@ -190,7 +190,15 @@ public class ServicioController {
         return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
 
-
+    @GetMapping("/servicio-list")
+    public ResponseEntity<List<ServicioResponse>> listarServicios() {
+        List<Servicio> servicios = servicioService.listarTodos();
+        List<ServicioResponse> respuesta = servicios.stream()
+                .map(DtoConverter::convertirARespuesta)
+                .collect(Collectors.toList());
+        
+        return ResponseEntity.ok(respuesta);
+    }
 
     private ServicioRequest parseServicioRequest(String datosJson) throws IOException {
         ObjectMapper objectMapper = new ObjectMapper();

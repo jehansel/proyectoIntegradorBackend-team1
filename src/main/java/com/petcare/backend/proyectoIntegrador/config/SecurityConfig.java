@@ -66,6 +66,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/mascotas/**").hasRole("ADMIN")
                         .requestMatchers("/api/especies/**").hasRole("ADMIN")
                         .requestMatchers("/swagger-ui/**", "/v3/**", "/api/auth/**").permitAll()
+                        .requestMatchers(HttpMethod.DELETE, "/api/usuarios/usuario-list/{id}").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/usuarios/usuario-list").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/usuarios/{id}/{role}").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthFilter,
                         org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
