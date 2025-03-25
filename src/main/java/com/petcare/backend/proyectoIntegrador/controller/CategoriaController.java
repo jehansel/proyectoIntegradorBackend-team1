@@ -10,6 +10,7 @@ import com.petcare.backend.proyectoIntegrador.entity.Categoria;
 import com.petcare.backend.proyectoIntegrador.service.ICategoriaService;
 import com.petcare.backend.proyectoIntegrador.util.DtoConverter;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +18,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -30,6 +33,9 @@ public class CategoriaController {
 
     @Autowired
     private S3Service s3Service;
+
+    @Value("${BUCKET_NAME}")
+    private String BUCKET_NAME;
 
     @GetMapping
     public ResponseEntity<List<CategoriaResponse>> obtenerTodasLasCategorias() {
@@ -154,5 +160,36 @@ public class CategoriaController {
         } else {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
+    }
+
+    @GetMapping("/categoria-list")
+    public ResponseEntity<List<Map<String, Object>>> listarCategorias() {
+        List<Categoria> categorias = categoriaService.obtenerTodasLasCategorias();
+        List<Map<String, Object>> categoriasSimplificadas = categorias.stream()
+            .map(categoria -> {
+                Map<String, Object> categoriaMap = new HashMap<>();
+                categoriaMap.put("id", categoria.getId_categoria());
+                categoriaMap.put("nombre", categoria.getNombre());
+                categoriaMap.put("descripcion", categoria.getDescripcion());
+                
+                // Procesar la URL de la imagen
+                String imagenUrl = categoria.getImagenUrl();
+                if (imagenUrl != null && !imagenUrl.isEmpty()) {
+                    // Verificar si la URL ya es una URL de S3 válida
+                    if (!imagenUrl.contains("s3.amazonaws.com")) {
+                        // Si no es una URL de S3, usar una imagen por defecto
+                        imagenUrl = "https://" + BUCKET_NAME + ".s3.amazonaws.com/default-category-image.jpg";
+                    }
+                } else {
+                    // Si no hay URL, usar una imagen por defecto
+                    imagenUrl = "https://" + BUCKET_NAME + ".s3.amazonaws.com/default-category-image.jpg";
+                }
+                
+                categoriaMap.put("imagenUrl", imagenUrl);
+                return categoriaMap;
+            })
+            .collect(Collectors.toList());
+
+        return ResponseEntity.ok(categoriasSimplificadas);
     }
 }
