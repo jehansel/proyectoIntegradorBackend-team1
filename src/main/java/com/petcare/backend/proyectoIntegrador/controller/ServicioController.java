@@ -5,16 +5,15 @@ import com.petcare.backend.proyectoIntegrador.DTO.ServiceRequestFilters;
 import com.petcare.backend.proyectoIntegrador.DTO.ServicioRequest;
 import com.petcare.backend.proyectoIntegrador.DTO.ServicioResponse;
 import com.petcare.backend.proyectoIntegrador.config.S3Service;
-import com.petcare.backend.proyectoIntegrador.entity.CaracteristicaValor;
-import com.petcare.backend.proyectoIntegrador.entity.Caracteristicas;
-import com.petcare.backend.proyectoIntegrador.entity.Servicio;
-import com.petcare.backend.proyectoIntegrador.entity.ServicioImagen;
+import com.petcare.backend.proyectoIntegrador.entity.*;
+import com.petcare.backend.proyectoIntegrador.repository.ICategoriaRepository;
 import com.petcare.backend.proyectoIntegrador.service.IServicioService;
 import com.petcare.backend.proyectoIntegrador.service.impl.ServicioServiceImpl;
 import com.petcare.backend.proyectoIntegrador.util.DtoConverter;
 
 import java.time.LocalDate;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -36,6 +35,9 @@ public class ServicioController {
     private static final String UPLOAD_DIR = "uploads/";
     private final IServicioService servicioService;
     private final S3Service s3Service;
+
+    @Autowired
+    private ICategoriaRepository categoriaRepository;
 
     ServicioController(ServicioServiceImpl servicioService, S3Service s3Service) {
         this.servicioService = servicioService;
@@ -205,7 +207,7 @@ public class ServicioController {
         return objectMapper.readValue(datosJson, ServicioRequest.class);
     }
 
-    private List<String> processAndUploadImages(List<MultipartFile> imagenes) throws IOException {
+    private List<String>        processAndUploadImages(List<MultipartFile> imagenes) throws IOException {
         // Example: Upload images to S3 and return URLs
         List<String> imageUrls = new ArrayList<>();
         for (MultipartFile file : imagenes) {
@@ -220,7 +222,9 @@ public class ServicioController {
         servicio.setNombre(servicioDTO.getNombre());
         servicio.setDescripcion(servicioDTO.getDescripcion());
         servicio.setPrecio(servicioDTO.getPrecio());
-        servicio.setCategoria(servicioDTO.getCategoria());
+        Categoria categoria = categoriaRepository.findById(servicioDTO.getCategoria().getId_categoria())
+                .orElseThrow(() -> new RuntimeException("Categoría no encontrada"));
+        servicio.setCategoria(categoria);
 
         if (servicioDTO.getCaracteristicas() != null) {
             List<CaracteristicaValor> caracteristicas = servicioDTO.getCaracteristicas().stream()
